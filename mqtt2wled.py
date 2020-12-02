@@ -41,9 +41,19 @@ def get_args():
     )
     parser.add_argument("--presets", help="Preset directory", required=True)
     parser.add_argument(
+        "--wled_ips", help="Comma separated list of WLED IPs", required=True
+    )
+    parser.add_argument(
+        "--button_mac",
+        help="MAC address of button presses sending device",
+        required=True,
+    )
+    parser.add_argument(
         "--config", help="Configuration file", default="config.ini", nargs="?"
     )
-    parser.add_argument("-t", "--topic", required=True, nargs="+", help="MQTT topics")
+    parser.add_argument(
+        "-t", "--topic", required=True, nargs="+", help="MQTT topic to listen"
+    )
     parser.add_argument("--mqtt_username", help="MQTT user name", nargs="?")
     parser.add_argument("--mqtt_password", help="MQTT password", nargs="?")
     parser.add_argument("--mqtt_host", help="MQTT host", nargs="?")
@@ -77,12 +87,15 @@ class WledController:
         self.presets1 = []
         self.presets2 = []
         self.b2_last_state = -1
-        self.b2_last_pressed = None
         self.b3_last_state = -1
-        self.b3_last_pressed = None
         self.current_preset1 = 0
         self.current_preset2 = 0
-        self.wled_ips = ["172.24.1.201", "172.24.1.202", "172.24.1.203", "172.24.1.204"]
+        self.wled_ips = self.args.wled_ips.split(",")
+        logging.debug(
+            "Using WLEDs in IPs {} (total {})".format(
+                self.args.wled_ips, len(self.wled_ips)
+            )
+        )
         self.config = configparser.ConfigParser()
         dir_path = os.path.dirname(os.path.realpath(__file__))
         self.config.read(os.path.join(dir_path, self.args.config))
@@ -183,7 +196,7 @@ class WledController:
         self.handle_jsonsensor(client, userdata, msg, payload)
 
     def next_effect(self):
-        self.send_telegram(1)
+        self.change_effect(1)
 
     def handle_jsonsensor(self, client, userdata, msg, payload):
         """
@@ -192,24 +205,22 @@ class WledController:
         now = pytz.timezone("Europe/Helsinki").localize(dt.datetime.now(), is_dst=None)
         msg = json.loads(payload)
         try:
-            if msg.get("mac") == "80:7D:3A:47:59:BA":
+            if msg.get("mac") == self.args.button_mac:
                 values = msg.get("data")
                 b2 = values.get("b2")
                 b3 = values.get("b3")
                 if b2 is not None and b2 != self.b2_last_state:
                     if b2 == 1:
-                        self.b2_last_pressed = now
-                        self.send_telegram(1)
+                        self.change_effect(1)
                     self.b2_last_state = b2
                 elif b3 is not None and b3 != self.b3_last_state:
                     if b3 == 1:
-                        self.b3_last_pressed = now
-                        self.send_telegram(2)
+                        self.change_effect(2)
                     self.b3_last_state = b3
         except Exception as err:
             print(err)
 
-    def send_telegram(self, p):
+    def change_effect(self, p):
         self.timer.cancel()
         if p == 1:
             self.current_preset1 += 1
