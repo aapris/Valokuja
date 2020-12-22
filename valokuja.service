@@ -1,0 +1,23 @@
+[Unit]
+Description=Valokuja daemon (valokuja)
+After=network.target
+
+[Service]
+PIDFile=/tmp/valokuja.pid
+User=pi
+Group=pi
+UMask=0002
+RuntimeDirectory=/home/pi/Valokuja/run
+WorkingDirectory=/home/pi/Valokuja
+ExecStart=/home/pi/Valokuja/venv/bin/python /home/pi/Valokuja/mqtt2wled.py -t ds/# -l INFO --config config.ini --presets /home/pi/Valokuja/presets/ --autochange 300 --wled_ips 172.24.1.201,172.24.1.202,172.24.1.203,172.24.1.204 --button_mac 80:7D:3A:47:59:BA
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+PrivateTmp=true
+StandardOutput=file:/home/pi/Valokuja/systemd_stdout_valokuja.log
+StandardError=file:/home/pi/Valokuja/systemd_stderr_valokuja.log
+SyslogIdentifier=Valokuja_valokuja
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
